@@ -4,33 +4,34 @@ set -euo pipefail
 export TOKENIZERS_PARALLELISM=false
 
 model_name=${MODEL_NAME:-TimeVLM}
-vlm_type=${VLM_TYPE:-clip}
+vlm_type=${VLM_TYPE:-vilt}
 gpu=${GPU:-0}
 image_size=${IMAGE_SIZE:-56}
 norm_const=${NORM_CONST:-0.4}
 three_channel_image=${THREE_CHANNEL_IMAGE:-True}
 finetune_vlm=${FINETUNE_VLM:-False}
 batch_size=${BATCH_SIZE:-32}
-num_workers=${NUM_WORKERS:-32}
+num_workers=${NUM_WORKERS:-8}
 learning_rate=${LEARNING_RATE:-0.001}
 seq_len=${SEQ_LEN:-512}
-train_epochs=${TRAIN_EPOCHS:-15}
+train_epochs=${TRAIN_EPOCHS:-10}
 seed=${SEED:-2021}
 log_to_console=${LOG_TO_CONSOLE:-True}
 
-wandb_project=${WANDB_PROJECT:-time-vlm-minimal-reproduction}
+wandb_project=${WANDB_PROJECT:-time-vlm-ablation-reproduction}
 wandb_entity=${WANDB_ENTITY:-}
 wandb_mode=${WANDB_MODE:-online}
-wandb_group=${WANDB_GROUP:-weather-minimal-reproduction}
-wandb_tags=${WANDB_TAGS:-minimal-reproduction,weather}
-summary_output_dir=${SUMMARY_OUTPUT_DIR:-reports/weather_minimal_wandb}
+wandb_group=${WANDB_GROUP:-weather-core-ablation}
+wandb_tags=${WANDB_TAGS:-phase3-ablation,weather}
+summary_output_dir=${SUMMARY_OUTPUT_DIR:-reports/weather_core_ablation}
 
-percents=${PERCENTS:-"0.1 1"}
+percents=${PERCENTS:-"0.1"}
 pred_lens=${PRED_LENS:-"96 192 336 720"}
+variants=${VARIANTS:-"full no_ral no_ral_l no_ral_g no_val no_tal"}
 
-mkdir -p logs
+mkdir -p logs/ablation
 echo "Working directory: $(pwd)"
-echo "Logs directory: $(pwd)/logs"
+echo "Logs directory: $(pwd)/logs/ablation"
 
 if [ ! -f "./dataset/Weather.csv" ]; then
     echo "Missing ./dataset/Weather.csv. Download the preprocessed datasets and place Weather.csv under ./dataset before running."
@@ -41,7 +42,7 @@ weather_d_model() {
     local percent=$1
     local pred_len=$2
 
-    if [ "$percent" = "1" ]; then
+    if [ "$percent" = "1" ] || [ "$percent" = "1.0" ]; then
         case "$pred_len" in
             96) echo 64 ;;
             192) echo 64 ;;
@@ -60,18 +61,25 @@ weather_d_model() {
     fi
 }
 
-run_weather() {
+task_for_percent() {
+    local percent=$1
+    if [ "$percent" = "1" ] || [ "$percent" = "1.0" ]; then
+        echo "long_term_forecast"
+    else
+        echo "few_shot_forecast"
+    fi
+}
+
+run_weather_ablation() {
     local percent=$1
     local pred_len=$2
-    local d_model=$3
-    local task_name="few_shot_forecast"
+    local variant=$3
+    local d_model=$4
+    local task_name
+    task_name=$(task_for_percent "$percent")
 
-    if [ "$percent" = "1" ]; then
-        task_name="long_term_forecast"
-    fi
-
-    local run_name="weather_${percent}p_sl${seq_len}_pl${pred_len}_seed${seed}_${vlm_type}"
-    local log_file="logs/${run_name}.log"
+    local run_name="weather_${variant}_${percent}p_sl${seq_len}_pl${pred_len}_seed${seed}_${vlm_type}"
+    local log_file="logs/ablation/${run_name}.log"
 
     echo "Running ${run_name}"
     : > "$log_file"
@@ -82,7 +90,7 @@ run_weather() {
       --is_training 1 \
       --root_path ./dataset/ \
       --data_path Weather.csv \
-      --model_id "Weather_${seq_len}_${pred_len}_${percent}p" \
+      --model_id "Weather_${seq_len}_${pred_len}_${percent}p_${variant}" \
       --model "$model_name" \
       --data custom \
       --features M \
@@ -96,7 +104,7 @@ run_weather() {
       --enc_in 21 \
       --dec_in 21 \
       --c_out 21 \
-      --des "WeatherMinimalWandb" \
+      --des "WeatherCoreAblation" \
       --itr 1 \
       --gpu "$gpu" \
       --use_amp \
@@ -114,12 +122,13 @@ run_weather() {
       --dropout 0.1 \
       --percent "$percent" \
       --seed "$seed" \
+      --ablation_variant "$variant" \
       --use_wandb True \
       --wandb_project "$wandb_project" \
       --wandb_entity "$wandb_entity" \
       --wandb_group "$wandb_group" \
       --wandb_run_name "$run_name" \
-      --wandb_tags "$wandb_tags,${task_name},percent-${percent},pred-len-${pred_len}" \
+      --wandb_tags "$wandb_tags,${task_name},${variant},percent-${percent},pred-len-${pred_len}" \
       --wandb_mode "$wandb_mode"
     )
 
@@ -134,7 +143,9 @@ run_weather() {
 for percent in $percents; do
     for pred_len in $pred_lens; do
         d_model=$(weather_d_model "$percent" "$pred_len")
-        run_weather "$percent" "$pred_len" "$d_model"
+        for variant in $variants; do
+            run_weather_ablation "$percent" "$pred_len" "$variant" "$d_model"
+        done
     done
 done
 

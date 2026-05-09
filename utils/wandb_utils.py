@@ -122,6 +122,7 @@ def wandb_log_forecast_summary(args, record):
         "paper_table/seq_len": record.get("seq_len"),
         "paper_table/pred_len": record.get("pred_len"),
         "paper_table/seed": record.get("seed"),
+        "paper_table/ablation_variant": record.get("ablation_variant", "full"),
     }
     for key, value in summary_fields.items():
         wandb.run.summary[key] = value
@@ -146,6 +147,7 @@ def wandb_log_forecast_summary(args, record):
             "percent",
             "seq_len",
             "pred_len",
+            "ablation_variant",
             "mse",
             "mae",
             "rmse",
@@ -160,6 +162,7 @@ def wandb_log_forecast_summary(args, record):
             record.get("percent"),
             record.get("seq_len"),
             record.get("pred_len"),
+            record.get("ablation_variant", "full"),
             metric_values["mse"],
             metric_values["mae"],
             metric_values["rmse"],

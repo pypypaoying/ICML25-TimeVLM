@@ -50,6 +50,7 @@ def save_forecast_metrics(args, setting, metrics, result_dir, extra=None):
         "seed": getattr(args, "seed", None),
         "d_model": getattr(args, "d_model", None),
         "vlm_type": getattr(args, "vlm_type", ""),
+        "ablation_variant": getattr(args, "ablation_variant", "full"),
         "use_mem_gate": getattr(args, "use_mem_gate", None),
         "finetune_vlm": getattr(args, "finetune_vlm", None),
         "learning_rate": getattr(args, "learning_rate", None),

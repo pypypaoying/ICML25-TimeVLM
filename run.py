@@ -112,6 +112,13 @@ if __name__ == '__main__':
     parser.add_argument('--w_out_query', type=str2bool, default=False, help='without query part')
     parser.add_argument('--visualize_embeddings', type=str2bool, default=False, help='visualize embeddings')
     parser.add_argument('--use_mem_gate', type=str2bool, default=False, help='use memory gate')
+    parser.add_argument(
+        '--ablation_variant',
+        type=str,
+        default='full',
+        choices=['full', 'no_ral', 'no_ral_l', 'no_ral_g', 'no_val', 'no_tal'],
+        help='Time-VLM ablation variant for reproduction tables'
+    )
 
     # GPU
     parser.add_argument('--use_gpu', type=bool, default=True, help='use gpu')

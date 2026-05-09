@@ -90,6 +90,7 @@ class Model(nn.Module):
         self.vlm_manager = VLMManager(config)
         self.device = torch.device('cuda:{}'.format(self.config.gpu))
         self.use_mem_gate = config.use_mem_gate
+        self.ablation_variant = getattr(config, "ablation_variant", "full")
         
         # Initialize patch memory bank
         self.patch_memory_bank = PatchMemoryBank(
@@ -232,13 +233,28 @@ class Model(nn.Module):
 
     def forward_prediction(self, x_enc, vision_embeddings, text_embeddings):
         B, L, n_vars = x_enc.shape
+
+        if self.ablation_variant == "no_ral":
+            multimodal_features = torch.cat([vision_embeddings, text_embeddings], dim=-1)
+            multimodal_features = self.multimodal_enhancement(multimodal_features)
+            multimodal_features = multimodal_features.unsqueeze(1).expand(-1, n_vars, -1)
+            multimodal_features = self.layer_norm(multimodal_features)
+            multimodal_features = self.multimodal_head(multimodal_features)
+            return multimodal_features.permute(0, 2, 1)
         
         # 1. Process temporal features
         patches, _ = self.patch_embedding(x_enc.transpose(1, 2))  # [B * n_vars, n_patches, d_model]
         
         # 2. Compute local and global memory
-        local_memory = self._compute_local_memory(patches)  # [B * n_vars, n_patches, d_model]
-        global_memory = self._compute_global_memory(patches)  # [B * n_vars, n_patches, d_model] or [B * n_vars, 1, d_model]
+        if self.ablation_variant == "no_ral_l":
+            local_memory = patches
+        else:
+            local_memory = self._compute_local_memory(patches)  # [B * n_vars, n_patches, d_model]
+
+        if self.ablation_variant == "no_ral_g":
+            global_memory = torch.zeros_like(local_memory)
+        else:
+            global_memory = self._compute_global_memory(patches)  # [B * n_vars, n_patches, d_model] or [B * n_vars, 1, d_model]
         
         # 3. Combine local and global memory
         if self.use_mem_gate:
@@ -308,9 +324,17 @@ class Model(nn.Module):
         # Convert time series data to images and generate text prompts
         images = self.vision_augmented_learner(x_enc, self.config.image_size, self.config.seq_len, self.config.periodicity)
         prompts = self.text_augmented_learner(x_enc, self.config.content, self.config.pred_len, self.config.seq_len)
+        if self.ablation_variant == "no_val" or getattr(self.config, "w_out_visual", False):
+            images = torch.zeros_like(images)
+        if self.ablation_variant == "no_tal" or getattr(self.config, "w_out_text", False):
+            prompts = [""] * B
         
         # Process inputs with the VLM
         vision_embeddings, text_embeddings = self.vlm_manager.process_inputs(B, images, prompts)
+        if self.ablation_variant == "no_val" or getattr(self.config, "w_out_visual", False):
+            vision_embeddings = torch.zeros_like(vision_embeddings)
+        if self.ablation_variant == "no_tal" or getattr(self.config, "w_out_text", False):
+            text_embeddings = torch.zeros_like(text_embeddings)
         
         # Main prediction branch
         predictions = self.forward_prediction(x_enc, vision_embeddings, text_embeddings)

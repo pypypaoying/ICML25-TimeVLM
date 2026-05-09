@@ -86,6 +86,7 @@ def _parse_setting(setting):
         "model": "",
         "model_id": "",
         "vlm_type": "",
+        "ablation_variant": "full",
         "seq_len": None,
         "label_len": None,
         "pred_len": None,
@@ -135,6 +136,7 @@ def _normalize_record(record, source_path):
     normalized = dict(record)
     normalized["dataset"] = dataset
     normalized["dataset_label"] = dataset_label
+    normalized["ablation_variant"] = record.get("ablation_variant") or "full"
     normalized["source_path"] = str(source_path)
     normalized["source_mtime"] = source_path.stat().st_mtime
     for metric_name in METRIC_ALIASES:
@@ -215,6 +217,7 @@ def latest_by_table_key(records):
             record.get("task_name", ""),
             str(record.get("percent", "")),
             record.get("dataset_label", ""),
+            record.get("ablation_variant", "full"),
             record.get("pred_len"),
         )
         current = keyed.get(key)
@@ -239,6 +242,7 @@ def write_raw_csv(records, output_path, method_name):
         "model_id",
         "d_model",
         "vlm_type",
+        "ablation_variant",
         "use_mem_gate",
         "seed",
         "mse",
@@ -258,6 +262,7 @@ def write_raw_csv(records, output_path, method_name):
             item.get("task_name", ""),
             str(item.get("percent", "")),
             _dataset_sort_key(item.get("dataset_label", "")),
+            item.get("ablation_variant", "full"),
             item.get("pred_len") or 0,
         )):
             row = {field: record.get(field, "") for field in fields}
@@ -287,9 +292,11 @@ def build_table_rows(records, method_name):
     for (task_name, percent), group in sorted(_table_groups(records).items()):
         by_dataset = defaultdict(dict)
         for record in group:
-            by_dataset[record.get("dataset_label", "")][record.get("pred_len")] = record
-        for dataset in sorted(by_dataset, key=_dataset_sort_key):
-            horizon_map = by_dataset[dataset]
+            dataset = record.get("dataset_label", "")
+            variant = record.get("ablation_variant", "full") or "full"
+            by_dataset[(dataset, variant)][record.get("pred_len")] = record
+        for dataset, variant in sorted(by_dataset, key=lambda item: (_dataset_sort_key(item[0]), item[1])):
+            horizon_map = by_dataset[(dataset, variant)]
             for metric_name in ["mse", "mae"]:
                 values = [horizon_map.get(h, {}).get(metric_name) for h in HORIZONS]
                 present = [value for value in values if value is not None]
@@ -298,21 +305,35 @@ def build_table_rows(records, method_name):
                     "percent": percent,
                     "method": method_name,
                     "dataset": dataset,
+                    "variant": variant,
                     "metric": metric_name.upper(),
                     **{str(h): values[i] for i, h in enumerate(HORIZONS)},
                     "avg": sum(present) / len(present) if present else None,
                 })
+
+    full_avg = {
+        (row["task_name"], row["percent"], row["dataset"], row["metric"]): row.get("avg")
+        for row in table_rows
+        if row.get("variant") == "full"
+    }
+    for row in table_rows:
+        baseline = full_avg.get((row["task_name"], row["percent"], row["dataset"], row["metric"]))
+        avg = row.get("avg")
+        if baseline and avg is not None:
+            row["avg_degradation_pct"] = (avg - baseline) / baseline * 100
+        else:
+            row["avg_degradation_pct"] = None
     return table_rows
 
 
 def write_table_csv(table_rows, output_path, decimals):
-    fields = ["task_name", "percent", "method", "dataset", "metric"] + [str(h) for h in HORIZONS] + ["avg"]
+    fields = ["task_name", "percent", "method", "dataset", "variant", "metric"] + [str(h) for h in HORIZONS] + ["avg", "avg_degradation_pct"]
     with output_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
         writer.writeheader()
         for row in table_rows:
             formatted = dict(row)
-            for horizon in [str(h) for h in HORIZONS] + ["avg"]:
+            for horizon in [str(h) for h in HORIZONS] + ["avg", "avg_degradation_pct"]:
                 formatted[horizon] = _fmt(formatted.get(horizon), decimals)
             writer.writerow(formatted)
 
@@ -331,16 +352,18 @@ def write_markdown(table_rows, output_path, method_name, decimals):
     for (task_name, percent), rows in sorted(grouped.items()):
         lines.append(f"## {_task_title(task_name, percent)}")
         lines.append("")
-        lines.append("| Dataset | Metric | 96 | 192 | 336 | 720 | Avg |")
-        lines.append("|---|---:|---:|---:|---:|---:|---:|")
+        lines.append("| Dataset | Variant | Metric | 96 | 192 | 336 | 720 | Avg | Avg Deg. % |")
+        lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|")
         for row in rows:
             values = [_fmt(row.get(str(h)), decimals) for h in HORIZONS]
             lines.append(
-                "| {dataset} | {metric} | {values} | {avg} |".format(
+                "| {dataset} | {variant} | {metric} | {values} | {avg} | {degradation} |".format(
                     dataset=row["dataset"],
+                    variant=row.get("variant", "full"),
                     metric=row["metric"],
                     values=" | ".join(values),
                     avg=_fmt(row.get("avg"), decimals),
+                    degradation=_fmt(row.get("avg_degradation_pct"), decimals),
                 )
             )
         lines.append("")
