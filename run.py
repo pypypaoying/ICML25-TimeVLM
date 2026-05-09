@@ -10,6 +10,7 @@ from exp.exp_anomaly_detection import Exp_Anomaly_Detection
 from exp.exp_classification import Exp_Classification
 from utils.print_args import print_args
 from utils.tools import load_content
+from utils.wandb_utils import finish_wandb, init_wandb
 import random
 import numpy as np
 
@@ -24,11 +25,6 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
     
 if __name__ == '__main__':
-    fix_seed = 2024
-    random.seed(fix_seed)
-    torch.manual_seed(fix_seed)
-    np.random.seed(fix_seed)
-
     parser = argparse.ArgumentParser(description='TimeVLM')
 
     # basic config
@@ -169,7 +165,23 @@ if __name__ == '__main__':
     # few-shot forecasting
     parser.add_argument('--percent', type=float, default=1, help='proportion of in-distribution downstream dataset')
 
+    # wandb logging
+    parser.add_argument('--use_wandb', type=str2bool, default=False, help='log training and test metrics to Weights & Biases')
+    parser.add_argument('--wandb_project', type=str, default='time-vlm-minimal-reproduction', help='wandb project name')
+    parser.add_argument('--wandb_entity', type=str, default='', help='wandb entity/team name; leave empty to use default')
+    parser.add_argument('--wandb_group', type=str, default='', help='wandb group name; leave empty to auto-generate')
+    parser.add_argument('--wandb_run_name', type=str, default='', help='wandb run name; leave empty to use experiment setting')
+    parser.add_argument('--wandb_tags', type=str, default='', help='comma-separated wandb tags')
+    parser.add_argument('--wandb_mode', type=str, default='online', choices=['online', 'offline', 'disabled'], help='wandb mode')
+
     args = parser.parse_args()
+    fix_seed = args.seed
+    random.seed(fix_seed)
+    torch.manual_seed(fix_seed)
+    np.random.seed(fix_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(fix_seed)
+
     args.use_gpu = True if torch.cuda.is_available() else False
 
     # set gpu id
@@ -218,12 +230,16 @@ if __name__ == '__main__':
                 args.percent,
                 ii)
 
-            print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
-            exp.train(setting)
+            init_wandb(args, setting)
+            try:
+                print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+                exp.train(setting)
 
-            print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            exp.test(setting)
-            torch.cuda.empty_cache()
+                print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+                exp.test(setting)
+            finally:
+                finish_wandb(args)
+                torch.cuda.empty_cache()
     else:
         ii = 0
         exp = Exp(args)
@@ -241,7 +257,10 @@ if __name__ == '__main__':
             args.percent,
             ii)
 
-        print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-        exp.test(setting, test=1)
-        
-        torch.cuda.empty_cache()
+        init_wandb(args, setting)
+        try:
+            print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
+            exp.test(setting, test=1)
+        finally:
+            finish_wandb(args)
+            torch.cuda.empty_cache()
