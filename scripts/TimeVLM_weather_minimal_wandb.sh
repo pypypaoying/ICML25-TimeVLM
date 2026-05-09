@@ -22,6 +22,7 @@ wandb_entity=${WANDB_ENTITY:-}
 wandb_mode=${WANDB_MODE:-online}
 wandb_group=${WANDB_GROUP:-weather-minimal-reproduction}
 wandb_tags=${WANDB_TAGS:-minimal-reproduction,weather}
+summary_output_dir=${SUMMARY_OUTPUT_DIR:-reports/weather_minimal_wandb}
 
 percents=${PERCENTS:-"0.1 1"}
 pred_lens=${PRED_LENS:-"96 192 336 720"}
@@ -109,7 +110,7 @@ run_weather() {
       --wandb_group "$wandb_group" \
       --wandb_run_name "$run_name" \
       --wandb_tags "$wandb_tags,${task_name},percent-${percent},pred-len-${pred_len}" \
-      --wandb_mode "$wandb_mode" > "$log_file"
+      --wandb_mode "$wandb_mode" > "$log_file" 2>&1
 }
 
 for percent in $percents; do
@@ -118,3 +119,10 @@ for percent in $percents; do
         run_weather "$percent" "$pred_len" "$d_model"
     done
 done
+
+python scripts/summarize_forecasting_results.py \
+  --results_dir results \
+  --output_dir "$summary_output_dir" \
+  --method_name "$model_name" \
+  --tasks long_term_forecast few_shot_forecast \
+  --datasets Weather

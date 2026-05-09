@@ -2,7 +2,8 @@ from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
-from utils.wandb_utils import wandb_log
+from utils.results_recorder import save_forecast_metrics
+from utils.wandb_utils import wandb_log, wandb_log_forecast_summary
 import torch
 import torch.nn as nn
 from torch import optim
@@ -289,5 +290,7 @@ class Exp_Few_Shot_Forecast(Exp_Basic):
         np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
         np.save(folder_path + 'pred.npy', preds)
         np.save(folder_path + 'true.npy', trues)
+        metric_record = save_forecast_metrics(self.args, setting, test_metrics, folder_path)
+        wandb_log_forecast_summary(self.args, metric_record)
 
         return test_metrics

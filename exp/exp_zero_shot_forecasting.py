@@ -4,6 +4,8 @@ from data_provider.data_factory import data_provider
 from exp.exp_basic import Exp_Basic
 from utils.tools import EarlyStopping, adjust_learning_rate, visual
 from utils.metrics import metric
+from utils.results_recorder import save_forecast_metrics
+from utils.wandb_utils import wandb_log, wandb_log_forecast_summary
 import torch
 import torch.nn as nn
 from torch import optim
@@ -262,9 +264,27 @@ class Exp_Zero_Shot_Forecast(Exp_Basic):
 
         mae, mse, rmse, mape, mspe = metric(preds, trues)
         print('MSE: {}, MAE: {}, DTW: {}'.format(mse, mae, dtw_score))
+        test_metrics = {
+            "test/mae": mae,
+            "test/mse": mse,
+            "test/rmse": rmse,
+            "test/mape": mape,
+            "test/mspe": mspe,
+        }
+        if isinstance(dtw_score, (int, float, np.integer, np.floating)):
+            test_metrics["test/dtw"] = dtw_score
+        wandb_log(self.args, test_metrics)
         
         np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe]))
         np.save(folder_path + 'pred.npy', preds)
         np.save(folder_path + 'true.npy', trues)
+        metric_record = save_forecast_metrics(
+            self.args,
+            setting,
+            test_metrics,
+            folder_path,
+            extra={"transfer": "{}->{}".format(self.args.data, self.args.target_data)},
+        )
+        wandb_log_forecast_summary(self.args, metric_record)
 
-        return
+        return test_metrics
