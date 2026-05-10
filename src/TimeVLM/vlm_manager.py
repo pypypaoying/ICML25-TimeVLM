@@ -171,8 +171,8 @@ class VLMManager:
     
     def _process_vilt_inputs(self, B, images, prompts, use_visual=True):
         encoding = self.processor(images=images, text=prompts, return_tensors="pt", padding=True).to(self.device)
-        if not use_visual and "pixel_mask" in encoding:
-            encoding["pixel_mask"] = torch.zeros_like(encoding["pixel_mask"])
+        # Keep ViLT's pixel_mask valid even for no-VAL ablations. ViLT uses the
+        # mask to infer the patch grid; an all-zero mask makes the grid 0 x 0.
         outputs = self.model(**encoding, output_hidden_states=True)
         last_hidden_state = outputs.last_hidden_state  # Shape: [B, seq_len, hidden_size]
         
