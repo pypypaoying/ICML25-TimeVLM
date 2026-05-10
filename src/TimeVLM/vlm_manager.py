@@ -126,14 +126,19 @@ class VLMManager:
         for child in model.children():
             self._set_requires_grad(child, value)
 
-    def process_inputs(self, B, images, prompts):
+    def process_inputs(self, B, images, prompts, use_visual=True, use_text=True):
+        if not use_text:
+            prompts = [""] * B
+        if not use_visual:
+            images = torch.zeros_like(images)
+
         try: 
             if self.vlm_type == "clip":
                 return self._process_clip_inputs(B, images, prompts)
             elif self.vlm_type == "blip2":
                 return self._process_blip2_inputs(B, images, prompts)
             elif self.vlm_type == "vilt":
-                return self._process_vilt_inputs(B, images, prompts)
+                return self._process_vilt_inputs(B, images, prompts, use_visual=use_visual)
             elif self.vlm_type == "custom":
                 return self._process_custom_inputs(B, images, prompts)
         except Exception as e:
@@ -164,8 +169,10 @@ class VLMManager:
         
         return image_features, text_features  # Both shape: [B, hidden_size]
     
-    def _process_vilt_inputs(self, B, images, prompts):
+    def _process_vilt_inputs(self, B, images, prompts, use_visual=True):
         encoding = self.processor(images=images, text=prompts, return_tensors="pt", padding=True).to(self.device)
+        if not use_visual and "pixel_mask" in encoding:
+            encoding["pixel_mask"] = torch.zeros_like(encoding["pixel_mask"])
         outputs = self.model(**encoding, output_hidden_states=True)
         last_hidden_state = outputs.last_hidden_state  # Shape: [B, seq_len, hidden_size]
         
@@ -176,7 +183,10 @@ class VLMManager:
         
         # Average pooling for both features
         text_features = text_features.mean(dim=1)  # [B, hidden_size]
-        image_features = image_features.mean(dim=1)  # [B, hidden_size]
+        if use_visual:
+            image_features = image_features.mean(dim=1)  # [B, hidden_size]
+        else:
+            image_features = torch.zeros(B, self.hidden_size, device=self.device)
         
         return image_features, text_features  # Both shape: [B, hidden_size]
     

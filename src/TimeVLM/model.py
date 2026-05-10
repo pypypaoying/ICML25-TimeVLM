@@ -247,7 +247,7 @@ class Model(nn.Module):
         
         # 2. Compute local and global memory
         if self.ablation_variant == "no_ral_l":
-            local_memory = patches
+            local_memory = torch.zeros_like(patches)
         else:
             local_memory = self._compute_local_memory(patches)  # [B * n_vars, n_patches, d_model]
 
@@ -322,18 +322,27 @@ class Model(nn.Module):
         x_enc, means, stdev = self._normalize_input(x_enc)
         
         # Convert time series data to images and generate text prompts
+        use_visual = not (self.ablation_variant == "no_val" or getattr(self.config, "w_out_visual", False))
+        use_text = not (self.ablation_variant == "no_tal" or getattr(self.config, "w_out_text", False))
+
         images = self.vision_augmented_learner(x_enc, self.config.image_size, self.config.seq_len, self.config.periodicity)
         prompts = self.text_augmented_learner(x_enc, self.config.content, self.config.pred_len, self.config.seq_len)
-        if self.ablation_variant == "no_val" or getattr(self.config, "w_out_visual", False):
+        if not use_visual:
             images = torch.zeros_like(images)
-        if self.ablation_variant == "no_tal" or getattr(self.config, "w_out_text", False):
+        if not use_text:
             prompts = [""] * B
         
         # Process inputs with the VLM
-        vision_embeddings, text_embeddings = self.vlm_manager.process_inputs(B, images, prompts)
-        if self.ablation_variant == "no_val" or getattr(self.config, "w_out_visual", False):
+        vision_embeddings, text_embeddings = self.vlm_manager.process_inputs(
+            B,
+            images,
+            prompts,
+            use_visual=use_visual,
+            use_text=use_text,
+        )
+        if not use_visual:
             vision_embeddings = torch.zeros_like(vision_embeddings)
-        if self.ablation_variant == "no_tal" or getattr(self.config, "w_out_text", False):
+        if not use_text:
             text_embeddings = torch.zeros_like(text_embeddings)
         
         # Main prediction branch
