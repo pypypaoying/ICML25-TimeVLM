@@ -1,136 +1,120 @@
-# Time-VLM: Exploring Multimodal Vision-Language Models for Augmented Time Series Forecasting
+# Time-VLM 论文复刻项目
 
-<div align="center">
+本仓库用于复刻 ICML 2025 论文 **Time-VLM: Exploring Multimodal Vision-Language Models for Augmented Time Series Forecasting**。原论文提出将时间序列、视觉表示和文本提示统一到预训练 Vision-Language Model 中，核心模块包括 Retrieval-Augmented Learner（RAL）、Vision-Augmented Learner（VAL）和 Text-Augmented Learner（TAL）。
 
-[![Paper](https://img.shields.io/badge/Paper-ArXiv-red.svg)](https://arxiv.org/abs/2502.04395)
-[![Conference](https://img.shields.io/badge/Conference-ICML%202025-blue.svg)](https://icml.cc/virtual/2025/poster/44762)
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.2.2+-green.svg)](https://pytorch.org/)
-[![Stars](https://img.shields.io/github/stars/CityMind-Lab/ICML25-TimeVLM?style=social)](https://github.com/CityMind-Lab/ICML25-TimeVLM)
+论文链接：[arXiv](https://arxiv.org/abs/2502.04395) / [PMLR](https://proceedings.mlr.press/v267/zhong25a.html) / [OpenReview PDF](https://openreview.net/pdf?id=b5h60xQnzM)
 
-</div>
+## 项目目的
 
-<div align="center">
+本项目不是重新提出新模型，而是围绕原论文做一套可检查、可导出、可对表的复刻流程：
 
-![Framework Architecture](framework.png)
+- 复刻 Time-VLM 在 Weather、M4 和 ETT transfer 场景中的关键实验。
+- 将训练过程和最终指标接入 Weights & Biases，方便后续整理 MSE、MAE、SMAPE、MASE、OWA。
+- 生成接近论文格式的表格图，便于直接和原论文表格逐项比较。
+- 标记未完成或需要重跑的实验，避免把不完整 run 当作复刻结论。
 
-*Time-VLM Framework Architecture*
+## 当前复刻范围
 
-</div>
+| 任务 | 原论文位置 | 当前状态 |
+|---|---|---|
+| Weather 5% few-shot | Table 1 / Appendix Table 12 | 已完成 |
+| Weather 10% few-shot | Table 2 / Appendix Table 13 | 已完成 |
+| Weather long-term 100% | Appendix Table 16 | 已完成 |
+| M4 short-term | Appendix Table 15 | 已完成 |
+| Zero-shot transfer | Table 3 / Appendix Table 14 | 待重跑，当前不纳入结论 |
+| Weather ablation | Table 6 | 待基于修正后的消融逻辑重跑，当前不纳入结论 |
 
-## 📖 Overview
+## 实验设置摘要
 
-Time-VLM provides an extensible framework for integrating various Vision-Language Models (VLMs) with time series forecasting. It supports multiple VLM types (CLIP, BLIP2, ViLT) and enables flexible multimodal experiments.
+当前已纳入 README 的复刻结果主要来自 Weather 和 M4：
 
-## 🚀 Quick Start
+- Weather: `seq_len=512`，`pred_len={96,192,336,720}`，`periodicity=144`，`features=M`。
+- M4: 使用 short-term forecasting 协议，指标为 SMAPE、MASE、OWA。
+- 优化设置参考论文 Appendix A：`batch_size=32`，`learning_rate=0.001`，`loss=MSE`，`norm_const=0.4`。
+- 当前 W&B 项目：`ab2669805434-south-china-university-of-technology/TimeVLM`。
 
-### Environment Setup
+## 复刻结果
 
-To set up the environment, install Python 3.8 with Pytorch 1.4.4. Use the following commands for convenience:
+### Weather 5% Few-shot
+
+![Weather 5% few-shot](reports/paper_tables_latest/fewshot_5p_weather_table.png)
+
+原论文 Weather 5% few-shot 的 Time-VLM 平均值为 **MSE 0.246 / MAE 0.284**。本次复刻为 **MSE 0.238 / MAE 0.276**，整体略优于论文表格，说明 Weather 5% 子任务复刻成功。
+
+### Weather 10% Few-shot
+
+![Weather 10% few-shot](reports/paper_tables_latest/fewshot_10p_weather_table.png)
+
+原论文 Weather 10% few-shot 的 Time-VLM 平均值为 **MSE 0.245 / MAE 0.282**。本次复刻为 **MSE 0.231 / MAE 0.269**，同样略优于论文表格。该结果使用普通 10% few-shot 复现 run，不混入 ablation run。
+
+### Weather Long-term 100%
+
+![Weather long-term](reports/paper_tables_latest/long_term_weather_table.png)
+
+原论文 Weather long-term 的 Time-VLM 平均值为 **MSE 0.224 / MAE 0.263**。本次复刻为 **MSE 0.227 / MAE 0.266**，差距约为 0.003，属于很接近的复刻结果。该部分可认为基本复刻成功。
+
+### M4 Short-term
+
+![M4 short-term](reports/paper_tables_latest/short_term_table.png)
+
+原论文 M4 short-term 的 Average 为 **SMAPE 11.894 / MASE 1.592 / OWA 0.855**。本次复刻为 **SMAPE 12.054 / MASE 1.619 / OWA 0.868**，整体略差但非常接近，差距主要在 Yearly、Quarterly、Monthly 分组；Others 分组略优于论文。该部分可认为达到近似复刻，但仍建议保留随机种子、环境和依赖版本差异的说明。
+
+## 待重跑实验
+
+### Zero-shot Transfer
+
+当前 W&B 中已有部分 zero-shot run，但若干 transfer pair 没有最终 MSE/MAE，日志只停留在 train/val 阶段。因此 README 暂不展示 zero-shot 图表，也不将其纳入复刻成功判断。
+
+待补充位置：
+
+> Zero-shot transfer table: 待重跑后补图。
+
+### Ablation
+
+此前发现 `no_ral_l` 和 `no_val` 的消融实现不够严格：`no_ral_l` 没有真正移除 local memory，`no_val` 对 ViLT 存在先图文交互再清零视觉向量的问题。当前代码已经修正消融屏蔽逻辑，但需要重新跑 `no_ral_l` 和 `no_val` 后再更新表格。
+
+待补充位置：
+
+> Weather ablation table: 待基于修正后代码重跑后补图。
+
+## 复刻结论
+
+当前已完成的 Weather 5%、Weather 10%、Weather long-term 和 M4 short-term 结果表明：
+
+- Weather few-shot 的 5% 和 10% 结果均优于原论文对应平均值。
+- Weather long-term 与原论文高度接近，MSE/MAE 平均值仅有约 0.003 的差距。
+- M4 short-term 略弱于原论文，但 SMAPE、MASE、OWA 的平均值均在接近范围内。
+- Zero-shot 和 ablation 尚不能给出最终判断，需要重跑并补表。
+
+因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 与消融实验待完成后再评价。**
+
+## 数据与运行说明
+
+请先下载原仓库提供的预处理数据，并放置在 `./dataset` 下。当前 `.gitignore` 已忽略 `dataset/`、`checkpoints/`、`logs/`、`results/`、`wandb/` 等运行产物目录。
+
+常用脚本：
 
 ```bash
-conda create -n Time-VLM python=3.8
-conda activate Time-VLM
-pip install -r requirements.txt
+# 10% few-shot
+bash scripts/TimeVLM_long_0.1p.sh
+
+# 100% long-term
+bash scripts/TimeVLM_long_1.0p.sh
+
+# M4 short-term
+bash scripts/TimeVLM_short.sh
+
+# zero-shot transfer
+bash scripts/TimeVLM_transfer.sh
 ```
 
-### Dataset Preparation
-
-Download the pre-processed datasets from:
-- **Google Drive**: [Download Link](https://drive.google.com/drive/folders/13Cg1KYOlzM5C7K8gK8NfC-F3EYxkM3D2?usp=sharing)
-- **Baidu Drive**: [Download Link](https://pan.baidu.com/s/1r3KhGd0Q9PJIUZdfEYoymg?pwd=i9iy)
-
-Place the downloaded data in the `./dataset` folder.
-
-### Running Experiments
-
-Run the following scripts for different forecasting tasks:
+使用 W&B 时建议统一项目和分组名，例如：
 
 ```bash
-# Long-term Forecasting (Full-shot, 100% data)
-bash ./scripts/TimeVLM_long_1.0p.sh
-
-# Long-term Forecasting (Few-shot, 10% data)
-bash ./scripts/TimeVLM_long_0.1p.sh
-
-# Short-term Forecasting
-bash ./scripts/TimeVLM_short.sh
-
-# Zero-shot Transfer Learning
-bash ./scripts/TimeVLM_transfer.sh
+WANDB_PROJECT=TimeVLM WANDB_GROUP=weather-5p-reproduction bash scripts/TimeVLM_weather_minimal_wandb.sh
 ```
 
-> **⚠️ Important Notes**: 
-> - Ensure you have downloaded the datasets and placed them in the correct directory
-> - The default parameters provided in scripts are a good starting point, but you need to adjust them based on your specific dataset and requirements
-> - **Script Naming Convention**: `TimeVLM_long_X.Xp.sh` where `X.Xp` indicates the percentage of data used (e.g., `1.0p` = 100%, `0.1p` = 10%)
-
-## 📁 Project Structure
-
-```
-Time-VLM/
-├── README.md                 # Project documentation
-├── requirements.txt          # Python dependencies
-├── run.py                    # Main entry point for training and testing
-├── dataset/                  # Dataset directory
-│   ├── ETT/                  # ETT datasets
-│   ├── Weather/              # Weather dataset
-│   ├── Electricity/          # Electricity dataset
-│   ├── Traffic/              # Traffic dataset
-│   └── ...
-├── scripts/                  # Training and evaluation scripts
-│   ├── TimeVLM_long_1.0p.sh # Long-term forecasting (full-shot, 100% data)
-│   ├── TimeVLM_long_0.1p.sh # Long-term forecasting (few-shot, 10% data)
-│   ├── TimeVLM_short.sh     # Short-term forecasting
-│   ├── TimeVLM_transfer.sh  # Zero-shot transfer learning
-│   └── ...
-├── src/                      # Source code
-│   ├── TimeVLM/             # Time-VLM model implementation
-│   │   ├── model.py         # Main model architecture
-│   │   ├── vlm_custom.py    # Custom VLM implementations
-│   │   ├── vlm_manager.py   # VLM manager for different types
-│   │   └── ...
-│   ├── utils/                # Utility functions
-│   ├── models/               # Model implementations
-│   ├── layers/               # Custom layers
-│   └── ...
-├── exp/                      # Experiment configurations
-├── logs/                     # Training logs
-├── ts-images/               # Generated time series images
-└── ...
-```
-
-## ⚙️ Configuration & Tuning
-
-### Core Parameters
-
-| Parameter | Default | Range | Description |
-|:---------:|:-------:|:-----:|:------------|
-| **`d_model`** | `128` | `32-512` | **Most Important**: Model dimension |
-| **`dropout`** | `0.1` | `0.1-0.5` | Dropout rate |
-| **`learning_rate`** | `0.001` | `0.0001-0.01` | Learning rate |
-| **`batch_size`** | `32` | `-` | Adjust based on GPU memory |
-| **`image_size`** | `56` | `28-112` | Time series image size |
-| **`periodicity`** | `24` | `-` | Data periodicity for image generation |
-| **`norm_const`** | `0.4` | `0.1-1.0` | Normalization constant |
-
-### Script Parameters
-
-| Parameter | Default | Description |
-|:---------:|:-------:|:------------|
-| **`percent`** | `1.0` | Data usage ratio |
-| **`vlm_type`** | `clip` | VLM type [clip, blip2, vilt, custom] |
-| **`image_size`** | `56` | Time series image size (28-224) |
-| **`periodicity`** | `24` | Data periodicity for image generation |
-| **`use_mem_gate`** | `True` | Memory fusion gate |
-| **`finetune_vlm`** | `False` | Finetune pre-trained VLM |
-| **`three_channel_image`** | `True` | Generate RGB images |
-| **`learnable_image`** | `True` | Learnable image generation |
-
-
-## 📚 Citation
-
-If you find this repository useful, please cite our paper:
+## Citation
 
 ```bibtex
 @inproceedings{zhong2025time,
