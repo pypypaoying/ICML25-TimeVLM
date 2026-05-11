@@ -21,7 +21,7 @@
 | Weather 10% few-shot | Table 2 / Appendix Table 13 | 已完成 |
 | Weather long-term 100% | Appendix Table 16 | 已完成 |
 | M4 short-term | Appendix Table 15 | 已完成 |
-| Zero-shot transfer | Table 3 / Appendix Table 14 | 待重跑，当前不纳入结论 |
+| Zero-shot transfer | Table 3 / Appendix Table 14 | 已完成 |
 | Weather ablation | Table 6 | 待基于修正后的消融逻辑重跑，当前不纳入结论 |
 
 ## 实验设置摘要
@@ -59,15 +59,15 @@
 
 原论文 M4 short-term 的 Average 为 **SMAPE 11.894 / MASE 1.592 / OWA 0.855**。本次复刻为 **SMAPE 12.054 / MASE 1.619 / OWA 0.868**，整体略差但非常接近，差距主要在 Yearly、Quarterly、Monthly 分组；Others 分组略优于论文。该部分可认为达到近似复刻，但仍建议保留随机种子、环境和依赖版本差异的说明。
 
-## 待重跑实验
-
 ### Zero-shot Transfer
 
-当前 W&B 中已有部分 zero-shot run，但若干 transfer pair 没有最终 MSE/MAE，日志只停留在 train/val 阶段。因此 README 暂不展示 zero-shot 图表，也不将其纳入复刻成功判断。
+![Zero-shot transfer](reports/phase3_tables_latest/zero_shot_latest_table.png)
 
-待补充位置：
+zero-shot transfer 使用 W&B group `zero-shot-transfer` 中较新的完整 run：该 group 内共有两套实验记录，旧 run 中存在 target dataset 路径错误和缺失 MSE/MAE 的问题，因此表格仅按 `(source, target, pred_len)` 选择最新且有最终 MSE/MAE 的 32 条 run。与原论文 Appendix Table 14 相比，本次复刻整体趋势一致，但数值略差：32 个 horizon 中有 3 个 MSE 优于论文，平均 MSE 差值为 **+0.0369**，平均 MAE 差值为 **+0.0248**。其中 `ETTh2 -> ETTm2` 和 `ETTm1 -> ETTm2` 与论文最接近，`ETTh2 -> ETTh1` 与 `ETTm2 -> ETTm1` 偏差较明显。该部分可认为完成复刻，但不是完全贴合论文数值。
 
-> Zero-shot transfer table: 待重跑后补图。
+## 待重跑实验
+
+当前只剩 Weather ablation 表格暂不纳入 README 最终结论。
 
 ### Ablation
 
@@ -84,9 +84,10 @@
 - Weather few-shot 的 5% 和 10% 结果均优于原论文对应平均值。
 - Weather long-term 与原论文高度接近，MSE/MAE 平均值仅有约 0.003 的差距。
 - M4 short-term 略弱于原论文，但 SMAPE、MASE、OWA 的平均值均在接近范围内。
-- Zero-shot 和 ablation 尚不能给出最终判断，需要重跑并补表。
+- Zero-shot 已完成完整 32 条 transfer/horizon 复刻，整体趋势与论文一致，但平均 MSE/MAE 略高于论文。
+- Ablation 尚不能给出最终判断，需要补表后再评价。
 
-因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 与消融实验待完成后再评价。**
+因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 完成但略弱于论文，消融实验待补表后再评价。**
 
 ## 数据与运行说明
 
