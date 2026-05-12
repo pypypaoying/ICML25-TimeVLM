@@ -23,6 +23,7 @@
 | M4 short-term | Appendix Table 15 | 已完成 |
 | Zero-shot transfer | Table 3 / Appendix Table 14 | 已完成 |
 | Weather ablation | Table 6 | 已完成，消融退化幅度与论文存在差异 |
+| Modality causality check | 扩展分析实验 | 已完成 |
 
 ## 实验设置摘要
 
@@ -71,17 +72,26 @@ zero-shot transfer 使用 W&B group `zero-shot-transfer` 中较新的完整 run�
 
 Weather ablation 使用 W&B group `weather-core-ablation` 的主体消融结果，并用修正后重跑的 `weather-core-ablation-v2` 覆盖 `w/o RAL-L` 和 `w/o VAL` 两列。结果显示，`w/o RAL` 的退化最明显，平均 **MSE 0.319 / MAE 0.355**，说明完整 RAL 模块对 Weather 10% few-shot 仍然关键；`w/o RAL-G` 有中等退化，平均 **MSE 0.258 / MAE 0.294**。但 `w/o RAL-L`、`w/o VAL` 和 `w/o TAL` 几乎接近 full model：full model 平均 **MSE 0.230 / MAE 0.269**，`w/o RAL-L` 为 **0.230 / 0.268**，`w/o VAL` 为 **0.230 / 0.268**，`w/o TAL` 为 **0.230 / 0.269**。因此，该消融流程已经跑完整，但与原论文 Table 6 中 `w/o RAL-L` 和 `w/o VAL` 明显退化的结论并不完全一致；这部分应标注为“完成复现流程，但机制结论存在差异”。
 
+### Modality Causality Check
+
+![Modality causality check](reports/phase3_tables_latest/modality_causality_table.png)
+
+为了进一步检查 TAL/VAL 是否真正提供了可被模型使用的语义信息，本项目额外设计了 modality causality check：在 Weather 10% few-shot 设置下，用随机文本、错误 domain prompt、错误视觉输入、随机噪声视觉输入等替代正常 TAL/VAL，并与 full model、`w/o TAL`、`w/o VAL` 对比。CSV 中 `random_tal` 表示随机文本替代，`wrong_tal` 表示错误 domain prompt，`wrong_val` 和 `noise_val` 表示错误或噪声视觉替代；`random_ral` 保留为导出 CSV 中的原始命名，用于表示该批实验中的随机化替代项。
+
+结果显示，各替代项与 full model 的平均误差几乎重合：full model 平均 **MSE 0.230 / MAE 0.269**，所有替代项的平均 MSE/MAE 变化量都小于 **0.001**。其中变化最大的 `random_ral` 也只有 **+0.0003 MSE / +0.0001 MAE**。这说明在当前 Weather 10% few-shot、单 seed 设置下，随机或错误 TAL/VAL 并不会显著破坏预测性能；结合 ablation 结果，更合理的解释是当前模型主要依赖时间序列预测分支和 RAL 整体结构，而 TAL/VAL 的语义内容没有表现出强因果贡献。该结论仍需多 seed 和其它数据集进一步确认。
+
 ## 复刻结论
 
-当前已完成的 Weather 5%、Weather 10%、Weather long-term、M4 short-term、zero-shot 和 Weather ablation 结果表明：
+当前已完成的 Weather 5%、Weather 10%、Weather long-term、M4 short-term、zero-shot、Weather ablation 和 modality causality check 结果表明：
 
 - Weather few-shot 的 5% 和 10% 结果均优于原论文对应平均值。
 - Weather long-term 与原论文高度接近，MSE/MAE 平均值仅有约 0.003 的差距。
 - M4 short-term 略弱于原论文，但 SMAPE、MASE、OWA 的平均值均在接近范围内。
 - Zero-shot 已完成完整 32 条 transfer/horizon 复刻，整体趋势与论文一致，但平均 MSE/MAE 略高于论文。
 - Ablation 已完成完整表格复刻；`w/o RAL` 退化方向与论文一致，但 `w/o RAL-L`、`w/o VAL`、`w/o TAL` 在本次复刻中几乎不退化，机制结论与论文 Table 6 存在差异。
+- Modality causality check 进一步显示，随机文本、错误 prompt 和错误/噪声视觉替代几乎不改变最终误差，说明当前设置下 TAL/VAL 语义内容的因果贡献较弱。
 
-因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 完成但略弱于论文，消融实验完成但部分模块退化结论与论文不完全一致。**
+因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 完成但略弱于论文，消融实验完成但部分模块退化结论与论文不完全一致；扩展因果检查提示 TAL/VAL 的语义内容在当前设置下并非主要性能来源。**
 
 ## 数据与运行说明
 
