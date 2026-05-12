@@ -22,7 +22,7 @@
 | Weather long-term 100% | Appendix Table 16 | 已完成 |
 | M4 short-term | Appendix Table 15 | 已完成 |
 | Zero-shot transfer | Table 3 / Appendix Table 14 | 已完成 |
-| Weather ablation | Table 6 | 待基于修正后的消融逻辑重跑，当前不纳入结论 |
+| Weather ablation | Table 6 | 已完成，消融退化幅度与论文存在差异 |
 
 ## 实验设置摘要
 
@@ -65,29 +65,23 @@
 
 zero-shot transfer 使用 W&B group `zero-shot-transfer` 中较新的完整 run：该 group 内共有两套实验记录，旧 run 中存在 target dataset 路径错误和缺失 MSE/MAE 的问题，因此表格仅按 `(source, target, pred_len)` 选择最新且有最终 MSE/MAE 的 32 条 run。与原论文 Appendix Table 14 相比，本次复刻整体趋势一致，但数值略差：32 个 horizon 中有 3 个 MSE 优于论文，平均 MSE 差值为 **+0.0369**，平均 MAE 差值为 **+0.0248**。其中 `ETTh2 -> ETTm2` 和 `ETTm1 -> ETTm2` 与论文最接近，`ETTh2 -> ETTh1` 与 `ETTm2 -> ETTm1` 偏差较明显。该部分可认为完成复刻，但不是完全贴合论文数值。
 
-## 待重跑实验
+### Weather Ablation
 
-当前只剩 Weather ablation 表格暂不纳入 README 最终结论。
+![Weather ablation](reports/phase3_tables_latest/ablation_complete_table.png)
 
-### Ablation
-
-此前发现 `no_ral_l` 和 `no_val` 的消融实现不够严格：`no_ral_l` 没有真正移除 local memory，`no_val` 对 ViLT 存在先图文交互再清零视觉向量的问题。当前代码已经修正消融屏蔽逻辑，但需要重新跑 `no_ral_l` 和 `no_val` 后再更新表格。
-
-待补充位置：
-
-> Weather ablation table: 待基于修正后代码重跑后补图。
+Weather ablation 使用 W&B group `weather-core-ablation` 的主体消融结果，并用修正后重跑的 `weather-core-ablation-v2` 覆盖 `w/o RAL-L` 和 `w/o VAL` 两列。结果显示，`w/o RAL` 的退化最明显，平均 **MSE 0.319 / MAE 0.355**，说明完整 RAL 模块对 Weather 10% few-shot 仍然关键；`w/o RAL-G` 有中等退化，平均 **MSE 0.258 / MAE 0.294**。但 `w/o RAL-L`、`w/o VAL` 和 `w/o TAL` 几乎接近 full model：full model 平均 **MSE 0.230 / MAE 0.269**，`w/o RAL-L` 为 **0.230 / 0.268**，`w/o VAL` 为 **0.230 / 0.268**，`w/o TAL` 为 **0.230 / 0.269**。因此，该消融流程已经跑完整，但与原论文 Table 6 中 `w/o RAL-L` 和 `w/o VAL` 明显退化的结论并不完全一致；这部分应标注为“完成复现流程，但机制结论存在差异”。
 
 ## 复刻结论
 
-当前已完成的 Weather 5%、Weather 10%、Weather long-term 和 M4 short-term 结果表明：
+当前已完成的 Weather 5%、Weather 10%、Weather long-term、M4 short-term、zero-shot 和 Weather ablation 结果表明：
 
 - Weather few-shot 的 5% 和 10% 结果均优于原论文对应平均值。
 - Weather long-term 与原论文高度接近，MSE/MAE 平均值仅有约 0.003 的差距。
 - M4 short-term 略弱于原论文，但 SMAPE、MASE、OWA 的平均值均在接近范围内。
 - Zero-shot 已完成完整 32 条 transfer/horizon 复刻，整体趋势与论文一致，但平均 MSE/MAE 略高于论文。
-- Ablation 尚不能给出最终判断，需要补表后再评价。
+- Ablation 已完成完整表格复刻；`w/o RAL` 退化方向与论文一致，但 `w/o RAL-L`、`w/o VAL`、`w/o TAL` 在本次复刻中几乎不退化，机制结论与论文 Table 6 存在差异。
 
-因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 完成但略弱于论文，消融实验待补表后再评价。**
+因此，本项目目前可以判断为：**Weather 主线复刻成功，M4 short-term 近似复刻成功，zero-shot 完成但略弱于论文，消融实验完成但部分模块退化结论与论文不完全一致。**
 
 ## 数据与运行说明
 
